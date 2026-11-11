@@ -1,10 +1,8 @@
 <div id="tab-blocked" class="page-view space-y-6">
   <div class="theme-card p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl">
     <div>
-      <h2 class="theme-heading text-sm font-bold uppercase">BLOCKED STATUS &amp; MITIGASI PENCEGAHAN</h2>
-      <p class="text-xs opacity-80 mt-1 font-mono">Manajemen Isolasi IP Terdeteksi Anomalous (Unblock / Blockfull)</p>
+      <h2 class="theme-heading text-sm font-bold uppercase">BLOCKED STATUS</h2>
     </div>
-    <span class="font-mono text-[9px] px-3 py-1.5 bg-black/60 border border-current">CSIRT NODE ACTIVE</span>
   </div>
 
   <div class="theme-card p-5 space-y-4 rounded-2xl">

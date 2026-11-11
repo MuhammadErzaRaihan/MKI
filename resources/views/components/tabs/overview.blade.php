@@ -7,7 +7,6 @@
         </h2>
         <span class="text-[10px] font-bold px-2.5 py-1 bg-rose-600 text-white uppercase animate-pulse">CRITICAL ANOMALY</span>
       </div>
-      <p class="text-xs opacity-80 mt-1 font-mono">Multi-Layer Threat Stream Analysis : Central SPBE Node</p>
     </div>
 
     <button onclick="window.openModal('Memuat laporan insiden #INC-2048 format PDF...')" class="px-4 py-2.5 theme-button-primary text-xs uppercase font-bold flex items-center gap-2">

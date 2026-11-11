@@ -8,7 +8,8 @@ export function switchTab(tabId) {
     { id: 'nav-tab-traffic', tab: 'tab-traffic' },
     { id: 'nav-tab-credential', tab: 'tab-credential' },
     { id: 'nav-tab-datalog', tab: 'tab-datalog' },
-    { id: 'nav-tab-blocked', tab: 'tab-blocked' }
+    { id: 'nav-tab-blocked', tab: 'tab-blocked' },
+    { id: 'nav-tab-settings', tab: 'tab-settings' }
   ];
 
   navs.forEach(nav => {

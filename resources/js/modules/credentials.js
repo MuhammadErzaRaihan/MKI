@@ -1,4 +1,4 @@
-let credentialsData = [
+export let credentialsData = [
   {
     nip: '6371012903910001',
     nama: 'Andi Saputra, ST',
@@ -20,6 +20,17 @@ let credentialsData = [
     ipDetected: '180.252.88.12 (Luar Kantor)',
     secretKey: 'SK-KALSEL-998',
     photo: 'https://placehold.co/120x150/0284C7/ffffff?text=Budi'
+  },
+  {
+    nip: '6371043009930005',
+    nama: 'Citra Lestari, M.T',
+    instansi: 'Dinas Pemasaran',
+    ttl: 'Martapura, 30 Sep 1993',
+    telp: '0852-7711-4039',
+    status: 'OFF',
+    ipDetected: '202.158.45.99 (Luar Kantor)',
+    secretKey: 'SK-KALSEL-304',
+    photo: 'https://placehold.co/120x150/6499CC/ffffff?text=Citra'
   }
 ];
 
@@ -41,7 +52,7 @@ export function renderCredentials(filterQuery = '') {
   if (badge) badge.innerText = `${filtered.length} RECORD FOUND`;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400 font-sans">Tidak ada data pegawai ditemukan.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center opacity-70 font-sans">Tidak ada data pegawai ditemukan.</td></tr>`;
     return;
   }
 
@@ -58,8 +69,8 @@ export function renderCredentials(filterQuery = '') {
         </div>
       </td>
       <td class="p-3">
-        <div class="font-bold font-sans text-sm text-slate-100">${item.nama}</div>
-        <div class="text-[10px] opacity-75 font-mono text-slate-200">${item.nip}</div>
+        <div class="font-bold font-sans text-sm">${item.nama}</div>
+        <div class="text-[10px] opacity-75 font-mono">${item.nip}</div>
       </td>
       <td class="p-3 font-mono text-[11px]">
         <div>${item.ttl}</div>
@@ -83,10 +94,10 @@ export function renderCredentials(filterQuery = '') {
       </td>
       <td class="p-3 text-right">
         <div class="flex items-center justify-end gap-1.5">
-          <button onclick="window.editCredential(${originalIndex})" class="p-1.5 bg-sky-600 text-white rounded-lg" title="Edit Pegawai">
+          <button type="button" onclick="window.editCredential(${originalIndex})" class="p-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition-all hover:scale-105" title="Edit Pegawai">
             <i class="fa-solid fa-pen-to-square text-xs"></i>
           </button>
-          <button onclick="window.deleteCredential(${originalIndex})" class="p-1.5 bg-rose-600 text-white rounded-lg" title="Hapus Pegawai">
+          <button type="button" onclick="window.deleteCredential(${originalIndex})" class="p-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition-all hover:scale-105" title="Hapus Pegawai">
             <i class="fa-solid fa-trash-can text-xs"></i>
           </button>
         </div>
@@ -97,8 +108,8 @@ export function renderCredentials(filterQuery = '') {
 }
 
 export function searchCredentials() {
-  const q = document.getElementById('credential-search')?.value || '';
-  renderCredentials(q);
+  const input = document.getElementById('credential-search');
+  if (input) renderCredentials(input.value);
 }
 
 export function openCredentialModal(editIndex = -1) {
@@ -114,19 +125,19 @@ export function openCredentialModal(editIndex = -1) {
 
   if (editIndex >= 0 && credentialsData[editIndex]) {
     const item = credentialsData[editIndex];
-    title.innerText = "EDIT KREDENSIAL PEGAWAI (ID CARD)";
+    if (title) title.innerText = "EDIT KREDENSIAL PEGAWAI (ID CARD)";
     document.getElementById('cred-nama').value = item.nama;
     document.getElementById('cred-nip').value = item.nip;
     document.getElementById('cred-instansi').value = item.instansi;
     document.getElementById('cred-ttl').value = item.ttl;
     document.getElementById('cred-telp').value = item.telp;
     document.getElementById('cred-secret').value = item.secretKey;
-    preview.src = item.photo;
+    if (preview) preview.src = item.photo;
     currentPhotoBase64 = item.photo;
   } else {
-    title.innerText = "SPBE DISKOMINFO - ID CARD PEGAWAI BARU";
+    if (title) title.innerText = "SPBE DISKOMINFO - ID CARD PEGAWAI BARU";
     form.reset();
-    preview.src = "https://placehold.co/120x150/0066D6/ffffff?text=FOTO+ID";
+    if (preview) preview.src = "https://placehold.co/120x150/0066D6/ffffff?text=FOTO+ID";
     currentPhotoBase64 = "https://placehold.co/120x150/0066D6/ffffff?text=FOTO+ID";
     generateSecretKey();
   }
@@ -145,6 +156,55 @@ export function generateSecretKey() {
   if (secretInput) secretInput.value = `SK-KALSEL-${randomNum}`;
 }
 
+export function previewPhotoUpload(event) {
+  const input = event.target || event.srcElement;
+  if (input && input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const preview = document.getElementById('photo-preview');
+      if (preview) preview.src = e.target.result;
+      currentPhotoBase64 = e.target.result;
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+export function saveCredentialForm(event) {
+  if (event && event.preventDefault) event.preventDefault();
+
+  const editIndex = parseInt(document.getElementById('cred-edit-index').value);
+  const nama = document.getElementById('cred-nama').value.trim();
+  const nip = document.getElementById('cred-nip').value.trim();
+  const instansi = document.getElementById('cred-instansi').value.trim();
+  const ttl = document.getElementById('cred-ttl').value.trim();
+  const telp = document.getElementById('cred-telp').value.trim();
+  const secretKey = document.getElementById('cred-secret').value;
+
+  const newRecord = {
+    nip: nip,
+    nama: nama,
+    instansi: instansi,
+    ttl: ttl,
+    telp: telp,
+    status: 'ON',
+    ipDetected: '192.168.10.' + Math.floor(10 + Math.random() * 80) + ' (IP Kantor)',
+    secretKey: secretKey,
+    photo: currentPhotoBase64 || "https://placehold.co/120x150/0066D6/ffffff?text=FOTO+ID"
+  };
+
+  if (editIndex >= 0) {
+    credentialsData[editIndex] = newRecord;
+    if (window.openModal) window.openModal(`Data Kredensial Pegawai <strong>${nama}</strong> berhasil diperbarui.`);
+  } else {
+    credentialsData.unshift(newRecord);
+    if (window.openModal) window.openModal(`Kredensial baru untuk <strong>${nama}</strong> berhasil ditambahkan!`);
+  }
+
+  closeCredentialModal();
+  renderCredentials();
+  return false;
+}
+
 export function editCredential(index) {
   openCredentialModal(index);
 }
@@ -156,5 +216,14 @@ export function deleteCredential(index) {
   if (confirm(`Apakah Anda yakin ingin menghapus kredensial ${item.nama}?`)) {
     credentialsData.splice(index, 1);
     renderCredentials();
+    if (window.openModal) window.openModal(`Kredensial pegawai <strong>${item.nama}</strong> telah dihapus.`);
   }
 }
+
+// Fallback listener otomatis saat DOM dimuat
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('form-credential');
+  if (form) {
+    form.addEventListener('submit', (e) => saveCredentialForm(e));
+  }
+});

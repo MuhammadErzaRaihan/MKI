@@ -1,10 +1,8 @@
 <div id="tab-traffic" class="page-view space-y-6">
   <div class="theme-card p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
     <div>
-      <h2 class="theme-heading text-sm font-bold uppercase">NETWORK TELEMETRY HUD</h2>
-      <p class="text-xs opacity-80 mt-1">Pemantauan Akses Perangkat Pengguna SPBE 2021 - 2026</p>
+      <h2 class="theme-heading text-sm font-bold uppercase">NETWORK TELEMETRY</h2>
     </div>
-    <span class="font-mono text-[9px] px-3 py-1.5 bg-black/60 border border-current">RANGE: 2021 - 2026</span>
   </div>
 
   <div class="theme-card p-6 space-y-4">

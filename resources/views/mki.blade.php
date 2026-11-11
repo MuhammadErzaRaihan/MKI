@@ -4,4 +4,5 @@
   @include('components.tabs.credential')
   @include('components.tabs.datalog')
   @include('components.tabs.blocked')
+  @include('components.tabs.settings')
 </x-layouts.app>

@@ -201,7 +201,7 @@ html[data-theme="clean"] .hover\:bg-slate-900\/60:hover {
   background-color: #BAE6FD !important;
 }
 html[data-theme="clean"] .text-amber-300 {
-  color: #0066D6 !important;
+  color: #fdec00 !important;
 }
 html[data-theme="clean"] .text-cyan-400 {
   color: #0284C7 !important;
@@ -218,3 +218,94 @@ button:active {
 html[data-theme="retro"] ::-webkit-scrollbar-thumb { background: #00E5E8; border-radius: 4px; }
 html[data-theme="soc"] ::-webkit-scrollbar-thumb { background: #485A55; border-radius: 4px; }
 html[data-theme="clean"] ::-webkit-scrollbar-thumb { background: #6499CC; border-radius: 4px; }
+
+/* Proteksi Terminal Container agar selalu Dark Console di semua Tema */
+html[data-theme="clean"] .terminal-box {
+  background-color: #090D16 !important;
+  color: #CBD5E1 !important;
+  border-color: #334155 !important;
+}
+
+html[data-theme="clean"] .terminal-box div:not([class*="text-"]) {
+  color: #CBD5E1 !important;
+}
+
+/* =========================================================
+   PROTEKSI HUD CAPSULE (JAM, TANGGAL & HARI) DI HEADER
+   ========================================================= */
+.hud-capsule {
+  background-color: #090D16 !important;
+  border-color: #334155 !important;
+  color: #F8FAFC !important;
+}
+
+html[data-theme="clean"] .hud-capsule #hud-clock-time {
+  color: #F8FAFC !important; /* Jam tetap Amber cerah */
+}
+
+html[data-theme="clean"] .hud-capsule #hud-clock-date {
+  color: #F8FAFC !important; /* Tanggal tetap Putih cerah */
+}
+
+html[data-theme="clean"] .hud-capsule #hud-clock-day {
+  color: #38BDF8 !important; /* Badge Hari tetap Cyan cerah */
+  background-color: #0C4A6E !important;
+  border-color: #0369A1 !important;
+}
+
+/* =========================================================
+   PROTEKSI TERMINAL DATA LOG STREAM (#Date & TIMESTAMPS)
+   ========================================================= */
+html[data-theme="clean"] .terminal-box {
+  background-color: #090D16 !important;
+  color: #CBD5E1 !important;
+  border-color: #334155 !important;
+}
+
+html[data-theme="clean"] .terminal-box .text-amber-300 {
+  color: #FCD34D !important; /* Menjaga header #Date & #Software tetap Kuning cerah */
+}
+
+html[data-theme="clean"] .terminal-box div:not([class*="text-"]) {
+  color: #000000 !important;
+}
+
+
+/* =========================================================
+   TERMINAL DATA LOG STREAM - LIGHT GOV HIGH CONTRAST FIX
+   ========================================================= */
+html[data-theme="clean"] .terminal-box {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border: 1.5px solid #7DD3FC !important;
+  box-shadow: inset 0 2px 4px 0 rgba(0, 102, 214, 0.05) !important;
+}
+
+/* Header Metadata (#Software, #Version, #Date) */
+html[data-theme="clean"] .terminal-box .log-header {
+  color: #0066D6 !important; /* Biru SPBE Utama */
+  font-weight: 700 !important;
+}
+
+/* Teks Baris Log Standar (HTTP 200 / 304) - Dibuat Pekat & Tegas */
+html[data-theme="clean"] .terminal-box .log-text {
+  color: #0F172A !important; /* Slate-900 Hitam/Navy Pekat */
+  font-weight: 600 !important; /* Mempertegas ketebalan font mono */
+  opacity: 1 !important;
+}
+
+/* Highlight Serangan SQLi (Critical Alert 403) */
+html[data-theme="clean"] .terminal-box .log-danger {
+  background-color: #FFE4E6 !important;
+  color: #9F1239 !important;
+  border: 1px solid #FECDD3 !important;
+  font-weight: 700 !important;
+}
+
+/* Highlight SYN Flood (Warning Alert 429) */
+html[data-theme="clean"] .terminal-box .log-warning {
+  background-color: #FEF3C7 !important;
+  color: #92400E !important;
+  border: 1px solid #FDE68A !important;
+  font-weight: 700 !important;
+}
