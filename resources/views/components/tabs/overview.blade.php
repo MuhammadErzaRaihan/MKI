@@ -67,6 +67,43 @@
     </div>
   </div>
 
+  <!-- Panel Hasil Inspeksi Gerbang & Telemetri -->
+  <div class="theme-card p-5 rounded-2xl space-y-4">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-current">
+      <div>
+        <h3 class="theme-heading text-xs font-bold uppercase tracking-wider">
+          <i class="fa-solid fa-radar text-cyan-400 mr-2"></i>Hasil Inspeksi Gerbang &amp; Telemetri
+        </h3>
+        <p class="text-xs opacity-75 mt-0.5">
+          Keputusan akses real-time, detection latency, dan aksi mitigasi dari Gerbang SPBE &amp; Web WAF.
+        </p>
+      </div>
+
+      <button type="button" id="overview-telemetry-refresh" class="px-3 py-1.5 rounded-lg theme-button-primary text-xs font-bold uppercase self-start sm:self-auto">
+        <i class="fa-solid fa-rotate mr-1"></i>Refresh Telemetri
+      </button>
+    </div>
+
+    <div id="overview-latest-telemetry" class="p-4 rounded-xl border border-current bg-black/30 text-xs">
+      Memuat hasil inspeksi terbaru...
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead>
+          <tr class="border-b border-current text-[10px] font-bold uppercase tracking-wider opacity-75">
+            <th class="py-2 pr-3">Waktu</th>
+            <th class="py-2 pr-3">IP Asal</th>
+            <th class="py-2 pr-3">Event</th>
+            <th class="py-2 pr-3">Status</th>
+            <th class="py-2 text-right">Latency</th>
+          </tr>
+        </thead>
+        <tbody id="overview-telemetry-list" class="divide-y divide-slate-800/60"></tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="theme-card p-6 space-y-6 rounded-2xl">
     <div class="flex items-center justify-between border-b border-current pb-3">
       <h3 class="theme-heading text-xs font-bold uppercase tracking-wide">STAGE TIMELINE NODES</h3>
@@ -155,3 +192,88 @@
     </div>
   </div>
 </div>
+
+<script>
+  (function () {
+    const latestBox = document.getElementById('overview-latest-telemetry');
+    const listBody = document.getElementById('overview-telemetry-list');
+    const refreshBtn = document.getElementById('overview-telemetry-refresh');
+
+    if (!latestBox || !listBody) return;
+
+    async function loadOverviewTelemetry() {
+      try {
+        const res = await fetch('/api/datalogs', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error('Gagal mengambil data telemetri.');
+
+        const json = await res.json();
+        const rows = json.data || [];
+
+        if (rows.length === 0) {
+          latestBox.textContent = 'Belum ada aktivitas inspeksi tercatat.';
+          listBody.innerHTML = '';
+          return;
+        }
+
+        const top = rows[0];
+        const badgeClass = top.status === 'ALLOWED'
+          ? 'bg-emerald-400 text-slate-950'
+          : top.status === 'SUSPICIOUS'
+            ? 'bg-amber-400 text-slate-950'
+            : 'bg-rose-500 text-white';
+
+        latestBox.innerHTML = '';
+
+        const header = document.createElement('div');
+        header.className = 'flex flex-wrap items-center justify-between gap-2 mb-2';
+
+        const badge = document.createElement('span');
+        badge.className = 'px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider ' + badgeClass;
+        badge.textContent = `${top.status} • ${top.event_type}`;
+
+        const meta = document.createElement('span');
+        meta.className = 'font-mono text-[11px] text-cyan-400 font-semibold';
+        meta.textContent = `Latency: ${top.detection_latency_ms ?? 0} ms | IP: ${top.ip_address} (${top.source})`;
+
+        header.append(badge, meta);
+
+        const detail = document.createElement('p');
+        detail.className = 'font-mono text-[11px] opacity-90 break-all';
+        detail.textContent = `Payload/Detail: ${top.payload_snippet || '-'}`;
+
+        const action = document.createElement('p');
+        action.className = 'text-[11px] opacity-80 mt-1';
+        action.textContent = `Mitigasi: ${top.recommended_action || '-'}`;
+
+        latestBox.append(header, detail, action);
+
+        listBody.innerHTML = '';
+        rows.slice(0, 5).forEach((row) => {
+          const tr = document.createElement('tr');
+
+          const cells = [
+            { text: row.created_at ? new Date(row.created_at).toLocaleTimeString('id-ID') : '-', cls: 'py-2 pr-3 font-mono text-[11px] opacity-75' },
+            { text: row.ip_address || '-', cls: 'py-2 pr-3 font-mono text-[11px] text-cyan-300' },
+            { text: row.event_type || '-', cls: 'py-2 pr-3 font-mono text-[11px]' },
+            { text: row.status || '-', cls: 'py-2 pr-3 font-mono text-[10px] font-bold ' + (row.status === 'BLOCKED' ? 'text-rose-400' : row.status === 'SUSPICIOUS' ? 'text-amber-300' : 'text-emerald-400') },
+            { text: `${row.detection_latency_ms ?? 0} ms`, cls: 'py-2 text-right font-mono text-[11px] text-cyan-400' },
+          ];
+
+          cells.forEach((c) => {
+            const td = document.createElement('td');
+            td.className = c.cls;
+            td.textContent = c.text;
+            tr.appendChild(td);
+          });
+
+          listBody.appendChild(tr);
+        });
+      } catch (err) {
+        latestBox.textContent = err.message;
+      }
+    }
+
+    if (refreshBtn) refreshBtn.addEventListener('click', loadOverviewTelemetry);
+    loadOverviewTelemetry();
+  })();
+</script>
