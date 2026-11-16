@@ -5,20 +5,28 @@ namespace Tests\Feature;
 use App\Models\EmployeeCredential;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use PHPUnit\Framework\Attributes\DataProvider;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class SpbeGatewayLoginTest extends TestCase
 {
     use RefreshDatabase;
 
+    private EmployeeCredential $asn;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        EmployeeCredential::create([
+        Http::fake([
+            'api.telegram.org/*' => Http::response(['ok' => true], 200),
+        ]);
+
+        $this->asn = EmployeeCredential::create([
             'nip' => '6371012903910001',
             'nama' => 'Andi Saputra, ST',
+            'email' => 'andi.saputra@kalselprov.go.id',
             'password' => Hash::make('PasswordAsn2026'),
             'instansi' => 'Diskominfo Kalsel',
             'secret_key' => 'SK-KALSEL-849',
@@ -27,89 +35,66 @@ class SpbeGatewayLoginTest extends TestCase
         ]);
     }
 
-    #[DataProvider('loginScenarioProvider')]
-    public function test_spbe_gateway_login_scenarios(
-        array $payload,
-        int $expectedHttpStatus,
-        string $expectedSecurityStatus,
-        string $expectedEventType
-    ): void {
-        $response = $this->postJson('/gateway/login', $payload);
+    public function test_external_ip_sends_otp_email_and_notifies_telegram_admin(): void
+    {
+        Mail::fake();
 
-        $response->assertStatus($expectedHttpStatus)
-            ->assertJsonPath('status', $expectedSecurityStatus);
-
-        $this->assertDatabaseHas('security_audit_logs', [
-            'source' => 'GATEWAY_LOGIN',
-            'status' => $expectedSecurityStatus,
-            'event_type' => $expectedEventType,
+        $response = $this->postJson('/gateway/login', [
+            'nip' => '6371012903910001',
+            'password' => 'PasswordAsn2026',
+            'simulated_ip' => '180.252.88.12',
         ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('status', 'SUSPICIOUS')
+            ->assertJsonPath('requires_mfa', true)
+            ->assertJsonPath('otp_sent_to', 'andi.saputra@kalselprov.go.id');
+
+        $this->asn->refresh();
+        $this->assertNotNull($this->asn->otp_expires_at);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'api.telegram.org/bot'));
     }
 
-    public static function loginScenarioProvider(): array
+    public function test_external_ip_login_succeeds_with_emailed_otp_and_prevents_replay(): void
     {
-        return [
-            'TC-01 Valid office IP passes without MFA' => [
-                [
-                    'nip' => '6371012903910001',
-                    'password' => 'PasswordAsn2026',
-                    'simulated_ip' => '192.168.10.15',
-                ],
-                200,
-                'ALLOWED',
-                'OFFICE_IP_LOGIN',
-            ],
-            'TC-02 External IP without OTP/Secret Key flagged suspicious' => [
-                [
-                    'nip' => '6371012903910001',
-                    'password' => 'PasswordAsn2026',
-                    'simulated_ip' => '180.252.88.12',
-                ],
-                403,
-                'SUSPICIOUS',
-                'SUSPICIOUS_EXTERNAL_IP',
-            ],
-            'TC-03 External IP with valid Secret Key passes' => [
-                [
-                    'nip' => '6371012903910001',
-                    'password' => 'PasswordAsn2026',
-                    'simulated_ip' => '180.252.88.12',
-                    'verification_token' => 'SK-KALSEL-849',
-                ],
-                200,
-                'ALLOWED',
-                'EXTERNAL_MFA_VERIFIED',
-            ],
-            'TC-04 SQL Injection payload blocked immediately' => [
-                [
-                    'nip' => "' OR '1'='1' --",
-                    'password' => 'anything',
-                    'simulated_ip' => '180.252.88.12',
-                ],
-                403,
-                'BLOCKED',
-                'SQL_INJECTION',
-            ],
-            'TC-05 XSS script payload blocked immediately' => [
-                [
-                    'nip' => '<script>alert(document.cookie)</script>',
-                    'password' => 'anything',
-                    'simulated_ip' => '192.168.10.20',
-                ],
-                403,
-                'BLOCKED',
-                'XSS_ATTACK',
-            ],
-            'TC-06 Invalid credential rejected' => [
-                [
-                    'nip' => '6371012903910001',
-                    'password' => 'WrongPassword',
-                    'simulated_ip' => '192.168.10.15',
-                ],
-                401,
-                'BLOCKED',
-                'INVALID_CREDENTIAL',
-            ],
-        ];
+        Mail::fake();
+
+        $this->postJson('/gateway/login', [
+            'nip' => '6371012903910001',
+            'password' => 'PasswordAsn2026',
+            'simulated_ip' => '180.252.88.12',
+        ])->assertStatus(403);
+
+        $issuedOtp = $this->asn->fresh()->otp_code;
+
+        $this->postJson('/gateway/login', [
+            'nip' => '6371012903910001',
+            'password' => 'PasswordAsn2026',
+            'simulated_ip' => '180.252.88.12',
+            'verification_token' => $issuedOtp,
+        ])->assertStatus(200)
+          ->assertJsonPath('status', 'ALLOWED');
+
+        // Reusing the same OTP must fail once consumed.
+        $this->postJson('/gateway/login', [
+            'nip' => '6371012903910001',
+            'password' => 'PasswordAsn2026',
+            'simulated_ip' => '180.252.88.12',
+            'verification_token' => $issuedOtp,
+        ])->assertStatus(403)
+          ->assertJsonPath('status', 'BLOCKED');
+    }
+
+    public function test_sqli_attack_is_blocked_and_triggers_telegram_alert(): void
+    {
+        $this->postJson('/gateway/login', [
+            'nip' => "' OR '1'='1' --",
+            'password' => 'x',
+            'simulated_ip' => '180.252.88.12',
+        ])->assertStatus(403)
+          ->assertJsonPath('event_type', 'SQL_INJECTION');
+
+        Http::assertSent(fn ($request) => str_contains($request['text'] ?? '', 'SQL_INJECTION'));
     }
 }

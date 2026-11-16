@@ -48,6 +48,19 @@
               <input type="text" id="cred-nip" required placeholder="16 Digit NIP" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 text-slate-900 font-mono">
             </div>
             <div>
+            <label for="cred-email" class="block text-[11px] font-bold uppercase tracking-wider mb-1">
+              Email Dinas ASN (Tujuan OTP)
+            </label>
+            <input
+              type="email"
+              id="cred-email"
+              name="email"
+              placeholder="nama.pegawai@kalselprov.go.id"
+              required
+              class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs focus:outline-none focus:border-sky-500"
+            >
+          </div>
+            <div>
               <label class="block font-bold text-slate-700 mb-1">Instansi / SKPD</label>
               <input type="text" id="cred-instansi" required placeholder="Dinas / SKPD" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 text-slate-900">
             </div>

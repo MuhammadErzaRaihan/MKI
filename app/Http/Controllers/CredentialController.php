@@ -21,6 +21,7 @@ class CredentialController extends Controller
                 $builder->where(function ($sub) use ($query) {
                     $sub->where('nama', 'like', "%{$query}%")
                         ->orWhere('nip', 'like', "%{$query}%")
+                        ->orWhere('email', 'like', "%{$query}%")
                         ->orWhere('instansi', 'like', "%{$query}%");
                 });
             })
@@ -38,6 +39,7 @@ class CredentialController extends Controller
         $validated = $request->validate([
             'nip' => ['required', 'string', 'max:18', 'unique:employee_credentials,nip'],
             'nama' => ['required', 'string', 'max:150'],
+            'email' => ['required', 'email', 'max:150', 'unique:employee_credentials,email'],
             'instansi' => ['required', 'string', 'max:150'],
             'ttl' => ['required', 'string', 'max:120'],
             'telp' => ['required', 'string', 'max:25'],
@@ -54,6 +56,7 @@ class CredentialController extends Controller
         $credential = EmployeeCredential::create([
             'nip' => $validated['nip'],
             'nama' => $validated['nama'],
+            'email' => $validated['email'],
             'instansi' => $validated['instansi'],
             'ttl' => $validated['ttl'],
             'telp' => $validated['telp'],
@@ -65,12 +68,16 @@ class CredentialController extends Controller
         ]);
 
         SecurityAuditLog::create([
-            'employee_credential_id' => $credential->id,
+            'source' => 'GATEWAY_LOGIN',
             'nip' => $credential->nip,
             'ip_address' => $clientIp,
-            'auth_method' => 'SYSTEM',
-            'result' => 'ALLOWED',
-            'description' => "Registrasi kredensial pegawai {$credential->nama}",
+            'protocol' => 'HTTP/POST',
+            'event_type' => 'CREDENTIAL_CREATED',
+            'severity' => 'INFO',
+            'status' => 'ALLOWED',
+            'detection_latency_ms' => 0,
+            'payload_snippet' => "Registrasi {$credential->nama} ({$credential->email})",
+            'recommended_action' => 'Tidak ada tindakan; pencatatan administrasi',
         ]);
 
         return response()->json([
@@ -84,6 +91,7 @@ class CredentialController extends Controller
         $validated = $request->validate([
             'nip' => ['required', 'string', 'max:18', Rule::unique('employee_credentials', 'nip')->ignore($credential->id)],
             'nama' => ['required', 'string', 'max:150'],
+            'email' => ['required', 'email', 'max:150', Rule::unique('employee_credentials', 'email')->ignore($credential->id)],
             'instansi' => ['required', 'string', 'max:150'],
             'ttl' => ['required', 'string', 'max:120'],
             'telp' => ['required', 'string', 'max:25'],
@@ -98,6 +106,7 @@ class CredentialController extends Controller
         $credential->update([
             'nip' => $validated['nip'],
             'nama' => $validated['nama'],
+            'email' => $validated['email'],
             'instansi' => $validated['instansi'],
             'ttl' => $validated['ttl'],
             'telp' => $validated['telp'],
@@ -106,130 +115,24 @@ class CredentialController extends Controller
             'photo_path' => $newPhotoPath,
         ]);
 
-        SecurityAuditLog::create([
-            'employee_credential_id' => $credential->id,
-            'nip' => $credential->nip,
-            'ip_address' => $request->ip() ?? '127.0.0.1',
-            'auth_method' => 'SYSTEM',
-            'result' => 'UPDATED',
-            'description' => "Pembaruan data kredensial pegawai {$credential->nama}",
-        ]);
-
         return response()->json([
             'message' => "Data kredensial {$credential->nama} berhasil diperbarui.",
             'data' => $credential->fresh(),
         ]);
     }
 
-    public function destroy(Request $request, EmployeeCredential $credential): JsonResponse
+    public function destroy(EmployeeCredential $credential): JsonResponse
     {
         $nama = $credential->nama;
-        $nip = $credential->nip;
 
         if ($credential->photo_path && Storage::disk('public')->exists($credential->photo_path)) {
             Storage::disk('public')->delete($credential->photo_path);
         }
 
-        SecurityAuditLog::create([
-            'employee_credential_id' => null,
-            'nip' => $nip,
-            'ip_address' => $request->ip() ?? '127.0.0.1',
-            'auth_method' => 'SYSTEM',
-            'result' => 'DELETED',
-            'description' => "Penghapusan kredensial pegawai {$nama} ({$nip})",
-        ]);
-
         $credential->delete();
 
         return response()->json([
             'message' => "Kredensial pegawai {$nama} telah dihapus.",
-        ]);
-    }
-
-    // Enforces SPBE access rule: office subnet uses OTP, external IP requires Secret Key.
-    public function verifyAccess(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'nip' => ['required', 'string', 'max:18'],
-            'otp_code' => ['nullable', 'string', 'max:10'],
-            'secret_key' => ['nullable', 'string', 'max:32'],
-            'simulated_ip' => ['nullable', 'ip'],
-        ]);
-
-        $ip = $validated['simulated_ip'] ?? ($request->ip() ?? '127.0.0.1');
-        $isOffice = EmployeeCredential::isOfficeNetwork($ip);
-        $credential = EmployeeCredential::where('nip', $validated['nip'])->first();
-
-        if (! $credential || $credential->status !== 'ON') {
-            SecurityAuditLog::create([
-                'employee_credential_id' => $credential?->id,
-                'nip' => $validated['nip'],
-                'ip_address' => $ip,
-                'auth_method' => $isOffice ? 'OTP' : 'SECRET_KEY',
-                'result' => 'BLOCKED',
-                'description' => 'NIP tidak ditemukan atau status kredensial nonaktif',
-            ]);
-
-            return response()->json([
-                'authenticated' => false,
-                'message' => 'Akses ditolak: NIP tidak terdaftar atau status kredensial OFF.',
-            ], 403);
-        }
-
-        if ($isOffice) {
-            $validOtp = ! empty($validated['otp_code']) && strlen($validated['otp_code']) === 6;
-
-            SecurityAuditLog::create([
-                'employee_credential_id' => $credential->id,
-                'nip' => $credential->nip,
-                'ip_address' => $ip,
-                'auth_method' => 'OTP',
-                'result' => $validOtp ? 'ALLOWED' : 'BLOCKED',
-                'description' => $validOtp
-                    ? 'Verifikasi OTP berhasil dalam lingkup IP Kantor'
-                    : 'Kode OTP tidak valid pada akses IP Kantor',
-            ]);
-
-            if (! $validOtp) {
-                return response()->json([
-                    'authenticated' => false,
-                    'required_method' => 'OTP',
-                    'message' => 'IP terdeteksi di lingkungan kantor. Masukkan 6 digit Kode OTP yang valid.',
-                ], 422);
-            }
-
-            return response()->json([
-                'authenticated' => true,
-                'required_method' => 'OTP',
-                'message' => 'Otentikasi OTP berhasil (Lingkup IP Kantor).',
-            ]);
-        }
-
-        $validKey = hash_equals($credential->secret_key, (string) ($validated['secret_key'] ?? ''));
-
-        SecurityAuditLog::create([
-            'employee_credential_id' => $credential->id,
-            'nip' => $credential->nip,
-            'ip_address' => $ip,
-            'auth_method' => 'SECRET_KEY',
-            'result' => $validKey ? 'ALLOWED' : 'BLOCKED',
-            'description' => $validKey
-                ? 'Verifikasi Secret Key berhasil dari IP Luar Kantor'
-                : 'Percobaan akses luar kantor dengan Secret Key tidak cocok',
-        ]);
-
-        if (! $validKey) {
-            return response()->json([
-                'authenticated' => false,
-                'required_method' => 'SECRET_KEY',
-                'message' => 'IP terdeteksi di luar kantor. Wajib menyertakan Secret Key spesifik pegawai.',
-            ], 403);
-        }
-
-        return response()->json([
-            'authenticated' => true,
-            'required_method' => 'SECRET_KEY',
-            'message' => 'Otentikasi Secret Key berhasil (Akses Luar Kantor).',
         ]);
     }
 

@@ -35,4 +35,16 @@ return [
         ],
     ],
 
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'chat_id' => env('TELEGRAM_CHAT_ID'),
+    ],
+
+    'spbe' => [
+        'office_cidrs' => array_filter(array_map('trim', explode(',', env(
+            'SPBE_OFFICE_CIDRS',
+            '127.0.0.1/32,::1/128,192.168.0.0/16,10.0.0.0/8'
+        )))),
+    ],
+
 ];

@@ -7,6 +7,7 @@ use App\Models\SecurityAuditLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 
 class SpbeGatewayController extends Controller
 {
@@ -47,7 +48,7 @@ class SpbeGatewayController extends Controller
 
         $credential = EmployeeCredential::where('nip', trim($rawNip))->first();
 
-        if (! $credential || $credential->status !== 'ON' || ! Hash::check($rawPassword, $credential->password)) {
+        if (! $credential || $credential->status !== 'ON' || ! Hash::check($rawPassword, (string) $credential->password)) {
             $log = $this->recordLog(
                 startedAt: $startedAt,
                 nip: mb_substr(trim($rawNip), 0, 64),
@@ -56,7 +57,7 @@ class SpbeGatewayController extends Controller
                 severity: 'LOW',
                 status: 'BLOCKED',
                 payload: 'Failed login attempt',
-                action: 'Verifikasi ulang NIP/Password; blokir IP jika gagal > 5x'
+                action: 'Verifikasi ulang NIP/Password; blokir IP jika gagal >= 3x'
             );
 
             return response()->json([
@@ -89,13 +90,16 @@ class SpbeGatewayController extends Controller
             ]);
         }
 
-        // External IPs are flagged suspicious and require either OTP or employee Secret Key.
-        $tokenValid = $verificationToken !== '' && (
-            hash_equals($credential->secret_key, $verificationToken) ||
-            hash_equals($credential->otp_code, $verificationToken)
-        );
+        // Issue and email a 5-minute OTP when an external IP authenticates without a token yet.
+        if ($verificationToken === '') {
+            $otp = (string) random_int(100000, 999999);
+            $credential->update([
+                'otp_code' => $otp,
+                'otp_expires_at' => now()->addMinutes(5),
+            ]);
 
-        if (! $tokenValid) {
+            $emailDispatched = $this->dispatchOtpEmail($credential, $otp, $clientIp);
+
             $log = $this->recordLog(
                 startedAt: $startedAt,
                 nip: $credential->nip,
@@ -103,17 +107,51 @@ class SpbeGatewayController extends Controller
                 eventType: 'SUSPICIOUS_EXTERNAL_IP',
                 severity: 'MEDIUM',
                 status: 'SUSPICIOUS',
-                payload: 'Login outside office CIDR without valid OTP/Secret Key',
-                action: 'Wajibkan input OTP atau Secret Key pegawai sebelum menerbitkan sesi'
+                payload: "External IP challenge; OTP emailed: " . ($emailDispatched ? 'yes' : 'no'),
+                action: 'Wajibkan input OTP dari email ASN atau Secret Key pegawai'
             );
 
             return response()->json([
                 'authenticated' => false,
                 'status' => 'SUSPICIOUS',
                 'requires_mfa' => true,
+                'otp_sent_to' => $credential->email,
                 'latency_ms' => $log->detection_latency_ms,
-                'message' => "IP ({$clientIp}) berada di luar jaringan instansi. Masukkan OTP atau Secret Key.",
+                'message' => $emailDispatched
+                    ? "IP ({$clientIp}) di luar kantor. Kode OTP telah dikirim ke {$credential->email} (berlaku 5 menit)."
+                    : "IP ({$clientIp}) di luar kantor. Email OTP gagal dikirim; gunakan Secret Key pegawai.",
             ], 403);
+        }
+
+        $isSecretValid = hash_equals($credential->secret_key, $verificationToken);
+        $isOtpValid = $credential->otp_expires_at !== null
+            && now()->lte($credential->otp_expires_at)
+            && hash_equals($credential->otp_code, $verificationToken);
+
+        if (! $isSecretValid && ! $isOtpValid) {
+            $log = $this->recordLog(
+                startedAt: $startedAt,
+                nip: $credential->nip,
+                ip: $clientIp,
+                eventType: 'INVALID_MFA_TOKEN',
+                severity: 'HIGH',
+                status: 'BLOCKED',
+                payload: 'Invalid or expired OTP/Secret Key from external IP',
+                action: 'Tolak akses luar kantor dan audit aktivitas NIP terkait'
+            );
+
+            return response()->json([
+                'authenticated' => false,
+                'status' => 'BLOCKED',
+                'requires_mfa' => true,
+                'latency_ms' => $log->detection_latency_ms,
+                'message' => 'Kode OTP kedaluwarsa/salah atau Secret Key tidak cocok.',
+            ], 403);
+        }
+
+        if ($isOtpValid) {
+            // Prevent OTP replay after successful verification.
+            $credential->update(['otp_expires_at' => null]);
         }
 
         $log = $this->recordLog(
@@ -123,8 +161,8 @@ class SpbeGatewayController extends Controller
             eventType: 'EXTERNAL_MFA_VERIFIED',
             severity: 'INFO',
             status: 'ALLOWED',
-            payload: "MFA verified for {$targetPortal}",
-            action: 'Sesi luar kantor sah melalui verifikasi Secret Key/OTP'
+            payload: "MFA verified (" . ($isOtpValid ? 'EMAIL_OTP' : 'SECRET_KEY') . ") for {$targetPortal}",
+            action: 'Sesi luar kantor sah melalui verifikasi MFA'
         );
 
         return response()->json([
@@ -132,7 +170,7 @@ class SpbeGatewayController extends Controller
             'status' => 'ALLOWED',
             'redirect_portal' => $targetPortal,
             'latency_ms' => $log->detection_latency_ms,
-            'message' => "Verifikasi OTP/Secret Key berhasil. Meneruskan ke {$targetPortal}.",
+            'message' => "Verifikasi MFA berhasil. Meneruskan ke {$targetPortal}.",
         ]);
     }
 
@@ -147,6 +185,34 @@ class SpbeGatewayController extends Controller
             ->get();
 
         return response()->json(['data' => $logs]);
+    }
+
+    public function sendTelegramMonitoringSummary(): JsonResponse
+    {
+        $totalBlocked = SecurityAuditLog::where('status', 'BLOCKED')->count();
+        $totalSuspicious = SecurityAuditLog::where('status', 'SUSPICIOUS')->count();
+        $avgLatency = round((float) SecurityAuditLog::avg('detection_latency_ms'), 3);
+
+        $summaryLog = new SecurityAuditLog([
+            'source' => 'MONITORING_REPORT',
+            'nip' => 'ADMIN-SOC',
+            'ip_address' => request()->ip() ?? '127.0.0.1',
+            'event_type' => 'SOC_STATUS_SUMMARY',
+            'severity' => 'INFO',
+            'status' => 'SUSPICIOUS',
+            'detection_latency_ms' => $avgLatency,
+            'payload_snippet' => "Blocked: {$totalBlocked} | Suspicious: {$totalSuspicious}",
+            'recommended_action' => 'Monitoring rutin Gerbang SPBE Diskominfo Kalsel',
+        ]);
+
+        $sent = SecurityAuditLog::sendTelegramAlert($summaryLog);
+
+        return response()->json([
+            'sent' => $sent,
+            'message' => $sent
+                ? 'Ringkasan monitoring berhasil dikirim ke Telegram Admin.'
+                : 'Gagal mengirim ke Telegram. Periksa TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID di .env.',
+        ], $sent ? 200 : 422);
     }
 
     public function inspectPayload(string $input): ?array
@@ -170,6 +236,32 @@ class SpbeGatewayController extends Controller
         }
 
         return null;
+    }
+
+    private function dispatchOtpEmail(EmployeeCredential $credential, string $otp, string $ip): bool
+    {
+        if (empty($credential->email)) {
+            return false;
+        }
+
+        try {
+            $body = implode("\n", [
+                "Yth. {$credential->nama} ({$credential->nip}),",
+                "",
+                "Terdeteksi upaya login Gerbang SPBE Diskominfo Kalsel dari IP luar kantor ({$ip}).",
+                "Kode OTP verifikasi Anda: {$otp}",
+                "Kode ini berlaku selama 5 menit. Jangan bagikan kepada siapa pun.",
+            ]);
+
+            Mail::raw($body, function ($message) use ($credential) {
+                $message->to($credential->email)
+                    ->subject('Kode OTP Verifikasi Gerbang SPBE Diskominfo Kalsel');
+            });
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function recordLog(

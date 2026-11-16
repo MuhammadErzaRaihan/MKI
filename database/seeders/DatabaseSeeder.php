@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
             [
                 'nip' => '6371012903910001',
                 'nama' => 'Andi Saputra, ST',
+                'email' => 'andi.saputra@kalselprov.go.id',
                 'password' => Hash::make('PasswordAsn2026'),
                 'instansi' => 'Diskominfo (HRD)',
                 'ttl' => 'Banjarmasin, 29 Mar 1991',
@@ -27,6 +28,7 @@ class DatabaseSeeder extends Seeder
             [
                 'nip' => '6371021506880003',
                 'nama' => 'Budi Santoso, S.Kom',
+                'email' => 'budi.santoso@kalselprov.go.id',
                 'password' => Hash::make('PasswordAsn2026'),
                 'instansi' => 'BPKAD (Keuangan)',
                 'ttl' => 'Banjarbaru, 15 Jun 1988',
@@ -40,6 +42,7 @@ class DatabaseSeeder extends Seeder
             [
                 'nip' => '6371043009930005',
                 'nama' => 'Citra Lestari, M.T',
+                'email' => 'citra.lestari@kalselprov.go.id',
                 'password' => Hash::make('PasswordAsn2026'),
                 'instansi' => 'Dinas Pemasaran',
                 'ttl' => 'Martapura, 30 Sep 1993',

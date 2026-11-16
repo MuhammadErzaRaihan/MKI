@@ -12,6 +12,7 @@ class EmployeeCredential extends Model
     protected $fillable = [
         'nip',
         'nama',
+        'email',
         'password',
         'instansi',
         'ttl',
@@ -21,14 +22,16 @@ class EmployeeCredential extends Model
         'is_office_ip',
         'secret_key',
         'otp_code',
+        'otp_expires_at',
         'photo_path',
     ];
 
-    protected $hidden = ['password'];
-
     protected $casts = [
         'is_office_ip' => 'boolean',
+        'otp_expires_at' => 'datetime',
     ];
+
+    protected $hidden = ['password'];
 
     protected $appends = [
         'photo_url',

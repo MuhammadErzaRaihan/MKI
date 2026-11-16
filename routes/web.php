@@ -13,12 +13,10 @@ Route::prefix('api')->group(function () {
     Route::post('/credentials', [CredentialController::class, 'store']);
     Route::put('/credentials/{credential}', [CredentialController::class, 'update']);
     Route::delete('/credentials/{credential}', [CredentialController::class, 'destroy']);
-    Route::post('/credentials/verify', [CredentialController::class, 'verifyAccess']);
 
     Route::get('/datalogs', [SpbeGatewayController::class, 'logs'])->name('api.datalogs');
+    Route::post('/monitoring/telegram-summary', [SpbeGatewayController::class, 'sendTelegramMonitoringSummary']);
 });
-
-
 
 
 // Route::get('/', [MkiController::class, 'index'])->name('mki.dashboard');

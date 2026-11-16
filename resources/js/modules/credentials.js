@@ -62,10 +62,11 @@ function renderCredentialsTable() {
       <td class="p-3">
         <div class="font-bold font-sans text-sm">${item.nama}</div>
         <div class="text-[10px] opacity-75 font-mono">${item.nip}</div>
+        <div class="text-[10px] text-sky-400 font-mono">${item.email || '-'}</div>
       </td>
       <td class="p-3 font-mono text-[11px]">
-        <div>${item.ttl}</div>
-        <div class="text-sky-400 font-bold mt-0.5"><i class="fa-solid fa-phone text-[9px] mr-1"></i>${item.telp}</div>
+        <div>${item.ttl || '-'}</div>
+        <div class="text-sky-400 font-bold mt-0.5"><i class="fa-solid fa-phone text-[9px] mr-1"></i>${item.telp || '-'}</div>
       </td>
       <td class="p-3 font-sans opacity-80">${item.instansi}</td>
       <td class="p-3 text-center">
@@ -125,9 +126,10 @@ export function openCredentialModal(credentialId = -1) {
     if (title) title.innerText = 'EDIT KREDENSIAL PEGAWAI (ID CARD)';
     document.getElementById('cred-nama').value = existing.nama;
     document.getElementById('cred-nip').value = existing.nip;
+    document.getElementById('cred-email').value = existing.email || '';
     document.getElementById('cred-instansi').value = existing.instansi;
-    document.getElementById('cred-ttl').value = existing.ttl;
-    document.getElementById('cred-telp').value = existing.telp;
+    document.getElementById('cred-ttl').value = existing.ttl || '';
+    document.getElementById('cred-telp').value = existing.telp || '';
     document.getElementById('cred-secret').value = existing.secret_key;
     if (preview) preview.src = existing.photo_url;
   } else {
@@ -173,6 +175,7 @@ export async function saveCredentialForm(event) {
   const payload = {
     nama: document.getElementById('cred-nama').value.trim(),
     nip: document.getElementById('cred-nip').value.trim(),
+    email: document.getElementById('cred-email').value.trim(),
     instansi: document.getElementById('cred-instansi').value.trim(),
     ttl: document.getElementById('cred-ttl').value.trim(),
     telp: document.getElementById('cred-telp').value.trim(),
