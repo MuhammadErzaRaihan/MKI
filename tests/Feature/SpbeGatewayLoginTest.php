@@ -114,4 +114,61 @@ class SpbeGatewayLoginTest extends TestCase
             ->assertStatus(200)
             ->assertJsonFragment(['event_type' => 'SQL_INJECTION']);
     }
+
+    public function test_instansi_ip_must_match_assigned_subnet_and_locks_out_after_three_failed_logins(): void
+    {
+        Mail::fake();
+
+        $bpkad = EmployeeCredential::create([
+            'nip' => '6371021506880003',
+            'nama' => 'Budi Santoso, S.Kom',
+            'email' => 'budi.santoso@kalselprov.go.id',
+            'password' => Hash::make('PasswordAsn2026'),
+            'instansi' => 'BPKAD (Keuangan)',
+            'secret_key' => 'SK-KALSEL-998',
+            'otp_code' => '654321',
+            'status' => 'ON',
+        ]);
+
+        // IP sesuai instansi BPKAD (10.10.10.10) -> langsung ALLOWED
+        $this->postJson('/gateway/login', [
+            'nip' => $bpkad->nip,
+            'password' => 'PasswordAsn2026',
+            'simulated_ip' => '10.10.10.10',
+        ])->assertStatus(200)->assertJsonPath('status', 'ALLOWED');
+
+        // IP berbeda (10.10.99.5) -> SUSPICIOUS & kirim OTP
+        $this->postJson('/gateway/login', [
+            'nip' => $bpkad->nip,
+            'password' => 'PasswordAsn2026',
+            'simulated_ip' => '10.10.99.5',
+        ])->assertStatus(403)->assertJsonPath('status', 'SUSPICIOUS');
+
+        // Brute force 3x salah password -> percobaan ke-4 terkena BRUTE_FORCE_LOCKOUT (429)
+        for ($i = 0; $i < 3; $i++) {
+            $this->postJson('/gateway/login', [
+                'nip' => $bpkad->nip,
+                'password' => 'SalahTerus',
+                'simulated_ip' => '203.0.113.77',
+            ])->assertStatus(401);
+        }
+
+        $this->postJson('/gateway/login', [
+            'nip' => $bpkad->nip,
+            'password' => 'PasswordAsn2026',
+            'simulated_ip' => '203.0.113.77',
+        ])->assertStatus(429)->assertJsonPath('event_type', 'BRUTE_FORCE_LOCKOUT');
+    }
+
+    public function test_internal_waf_middleware_blocks_xss_on_general_web_routes(): void
+    {
+        $this->get('/?search=' . urlencode('<script>alert(1)</script>'))
+            ->assertStatus(403);
+
+        $this->assertDatabaseHas('security_audit_logs', [
+            'source' => 'WEB_WAF',
+            'event_type' => 'XSS_ATTACK',
+            'status' => 'BLOCKED',
+        ]);
+    }
 }

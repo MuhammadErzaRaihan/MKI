@@ -20,10 +20,10 @@ class SpbeGatewayController extends Controller
         $verificationToken = trim((string) $request->input('verification_token', ''));
         $targetPortal = (string) $request->input('target_portal', 'portal-asn.kalselprov.go.id');
 
-        // Allow simulated_ip header/input so controlled UTS lab tests can emulate external IPs locally.
         $clientIp = $request->input('simulated_ip')
             ?: ($request->header('X-Simulated-IP') ?: ($request->ip() ?? '127.0.0.1'));
 
+        // 1. Inspeksi SQL Injection & XSS sebelum menyentuh query autentikasi
         $threat = $this->inspectPayload($rawNip . ' ' . $rawPassword);
         if ($threat !== null) {
             $log = $this->recordLog(
@@ -46,9 +46,38 @@ class SpbeGatewayController extends Controller
             ], 403);
         }
 
+        // 2. Blokir sementara jika IP sudah gagal login >= 3x dalam 5 menit (Brute Force)
+        $recentFailedLogins = SecurityAuditLog::where('ip_address', $clientIp)
+            ->where('event_type', 'INVALID_CREDENTIAL')
+            ->where('created_at', '>=', now()->subMinutes(5))
+            ->count();
+
+        if ($recentFailedLogins >= 3) {
+            $log = $this->recordLog(
+                startedAt: $startedAt,
+                nip: mb_substr(trim($rawNip), 0, 64),
+                ip: $clientIp,
+                eventType: 'BRUTE_FORCE_LOCKOUT',
+                severity: 'HIGH',
+                status: 'BLOCKED',
+                payload: "Locked out after {$recentFailedLogins} failed attempts",
+                action: 'Kunci akses IP selama 5 menit dan laporkan ke SOC'
+            );
+
+            return response()->json([
+                'authenticated' => false,
+                'status' => 'BLOCKED',
+                'event_type' => 'BRUTE_FORCE_LOCKOUT',
+                'latency_ms' => $log->detection_latency_ms,
+                'message' => "IP {$clientIp} diblokir sementara (5 menit) akibat percobaan login gagal berulang kali.",
+            ], 429);
+        }
+
+        // 3. Validasi Kredensial ASN
         $credential = EmployeeCredential::where('nip', trim($rawNip))->first();
 
         if (! $credential || $credential->status !== 'ON' || ! Hash::check($rawPassword, (string) $credential->password)) {
+            $attemptNo = $recentFailedLogins + 1;
             $log = $this->recordLog(
                 startedAt: $startedAt,
                 nip: mb_substr(trim($rawNip), 0, 64),
@@ -56,8 +85,8 @@ class SpbeGatewayController extends Controller
                 eventType: 'INVALID_CREDENTIAL',
                 severity: 'LOW',
                 status: 'BLOCKED',
-                payload: 'Failed login attempt',
-                action: 'Verifikasi ulang NIP/Password; blokir IP jika gagal >= 3x'
+                payload: "Failed login attempt ({$attemptNo}/3)",
+                action: 'Verifikasi ulang NIP/Password; kunci IP jika gagal >= 3x'
             );
 
             return response()->json([
@@ -65,11 +94,12 @@ class SpbeGatewayController extends Controller
                 'status' => 'BLOCKED',
                 'event_type' => 'INVALID_CREDENTIAL',
                 'latency_ms' => $log->detection_latency_ms,
-                'message' => 'NIP atau kata sandi ASN tidak valid.',
+                'message' => "NIP atau kata sandi ASN tidak valid (percobaan {$attemptNo}/3).",
             ], 401);
         }
 
-        if (EmployeeCredential::isOfficeIp($clientIp)) {
+        // 4. Verifikasi IP Resmi Instansi ASN (misal BPKAD wajib 10.10.10.10)
+        if ($credential->isAllowedInstansiIp($clientIp)) {
             $log = $this->recordLog(
                 startedAt: $startedAt,
                 nip: $credential->nip,
@@ -77,20 +107,21 @@ class SpbeGatewayController extends Controller
                 eventType: 'OFFICE_IP_LOGIN',
                 severity: 'INFO',
                 status: 'ALLOWED',
-                payload: "Access granted to {$targetPortal}",
-                action: 'Tidak ada tindakan; akses jaringan internal sah'
+                payload: "Verified {$credential->instansi} IP -> {$targetPortal}",
+                action: 'Tidak ada tindakan; akses jaringan instansi sah'
             );
 
             return response()->json([
                 'authenticated' => true,
                 'status' => 'ALLOWED',
+                'event_type' => 'OFFICE_IP_LOGIN',
                 'redirect_portal' => $targetPortal,
                 'latency_ms' => $log->detection_latency_ms,
-                'message' => "IP Kantor terverifikasi. Meneruskan {$credential->nama} ke {$targetPortal}.",
+                'message' => "IP Instansi ({$credential->instansi}) terverifikasi. Meneruskan {$credential->nama} ke {$targetPortal}.",
             ]);
         }
 
-        // Issue and email a 5-minute OTP when an external IP authenticates without a token yet.
+        // 5. IP tidak sesuai subnet instansi / luar kantor -> Tantangan OTP Email + Alert Telegram
         if ($verificationToken === '') {
             $otp = (string) random_int(100000, 999999);
             $credential->update([
@@ -107,19 +138,49 @@ class SpbeGatewayController extends Controller
                 eventType: 'SUSPICIOUS_EXTERNAL_IP',
                 severity: 'MEDIUM',
                 status: 'SUSPICIOUS',
-                payload: "External IP challenge; OTP emailed: " . ($emailDispatched ? 'yes' : 'no'),
+                payload: "IP {$clientIp} mismatch for {$credential->instansi}; OTP emailed: " . ($emailDispatched ? 'yes' : 'no'),
                 action: 'Wajibkan input OTP dari email ASN atau Secret Key pegawai'
             );
 
             return response()->json([
                 'authenticated' => false,
                 'status' => 'SUSPICIOUS',
+                'event_type' => 'SUSPICIOUS_EXTERNAL_IP',
                 'requires_mfa' => true,
                 'otp_sent_to' => $credential->email,
                 'latency_ms' => $log->detection_latency_ms,
                 'message' => $emailDispatched
-                    ? "IP ({$clientIp}) di luar kantor. Kode OTP telah dikirim ke {$credential->email} (berlaku 5 menit)."
-                    : "IP ({$clientIp}) di luar kantor. Email OTP gagal dikirim; gunakan Secret Key pegawai.",
+                    ? "IP ({$clientIp}) tidak sesuai jaringan {$credential->instansi}. Kode OTP dikirim ke {$credential->email} (berlaku 5 menit)."
+                    : "IP ({$clientIp}) tidak sesuai jaringan {$credential->instansi}. Gunakan Secret Key pegawai.",
+            ], 403);
+        }
+
+        // 6. Deteksi Anomali MFA (Brute force token OTP >= 3x, kedaluwarsa, atau replay)
+        $failedMfaCount = SecurityAuditLog::where('nip', $credential->nip)
+            ->where('event_type', 'INVALID_MFA_TOKEN')
+            ->where('created_at', '>=', now()->subMinutes(5))
+            ->count();
+
+        if ($failedMfaCount >= 3) {
+            $credential->update(['otp_expires_at' => null]);
+
+            $log = $this->recordLog(
+                startedAt: $startedAt,
+                nip: $credential->nip,
+                ip: $clientIp,
+                eventType: 'MFA_BRUTE_FORCE',
+                severity: 'CRITICAL',
+                status: 'BLOCKED',
+                payload: 'OTP invalidated after >= 3 invalid MFA attempts',
+                action: 'Cabut OTP aktif dan kunci sesi verifikasi MFA'
+            );
+
+            return response()->json([
+                'authenticated' => false,
+                'status' => 'BLOCKED',
+                'event_type' => 'MFA_BRUTE_FORCE',
+                'latency_ms' => $log->detection_latency_ms,
+                'message' => 'Percobaan OTP salah berulang kali. Sesi OTP dicabut otomatis.',
             ], 403);
         }
 
@@ -136,21 +197,22 @@ class SpbeGatewayController extends Controller
                 eventType: 'INVALID_MFA_TOKEN',
                 severity: 'HIGH',
                 status: 'BLOCKED',
-                payload: 'Invalid or expired OTP/Secret Key from external IP',
-                action: 'Tolak akses luar kantor dan audit aktivitas NIP terkait'
+                payload: 'Invalid, expired, or replayed OTP/Secret Key',
+                action: 'Tolak akses luar instansi dan audit aktivitas NIP terkait'
             );
 
             return response()->json([
                 'authenticated' => false,
                 'status' => 'BLOCKED',
+                'event_type' => 'INVALID_MFA_TOKEN',
                 'requires_mfa' => true,
                 'latency_ms' => $log->detection_latency_ms,
-                'message' => 'Kode OTP kedaluwarsa/salah atau Secret Key tidak cocok.',
+                'message' => 'Kode OTP salah/kedaluwarsa/sudah terpakai atau Secret Key tidak cocok.',
             ], 403);
         }
 
         if ($isOtpValid) {
-            // Prevent OTP replay after successful verification.
+            // Hanguskan OTP setelah dipakai agar tidak bisa di-replay
             $credential->update(['otp_expires_at' => null]);
         }
 
@@ -162,12 +224,13 @@ class SpbeGatewayController extends Controller
             severity: 'INFO',
             status: 'ALLOWED',
             payload: "MFA verified (" . ($isOtpValid ? 'EMAIL_OTP' : 'SECRET_KEY') . ") for {$targetPortal}",
-            action: 'Sesi luar kantor sah melalui verifikasi MFA'
+            action: 'Sesi luar jaringan instansi sah melalui verifikasi MFA'
         );
 
         return response()->json([
             'authenticated' => true,
             'status' => 'ALLOWED',
+            'event_type' => 'EXTERNAL_MFA_VERIFIED',
             'redirect_portal' => $targetPortal,
             'latency_ms' => $log->detection_latency_ms,
             'message' => "Verifikasi MFA berhasil. Meneruskan ke {$targetPortal}.",
@@ -289,7 +352,7 @@ class SpbeGatewayController extends Controller
             'recommended_action' => $action,
         ]);
     }
-    
+
     public function showLogin()
     {
         return view('gateway-login');

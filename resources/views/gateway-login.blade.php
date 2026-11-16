@@ -43,9 +43,10 @@
                         Simulasi IP Klien (Lingkup Pengujian Lab)
                     </label>
                     <select id="gw-ip" name="simulated_ip" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs font-mono focus:outline-none focus:border-sky-500">
-                        <option value="192.168.10.15">192.168.10.15 — IP Kantor Diskominfo (Trusted Subnet)</option>
-                        <option value="10.10.5.20">10.10.5.20 — Intranet Pemprov Kalsel (Trusted Subnet)</option>
-                        <option value="180.252.88.12">180.252.88.12 — IP Publik Luar Kantor (Suspicious / Wajib MFA)</option>
+                        <option value="192.168.10.15">192.168.10.15 — IP Kantor Diskominfo</option>
+                        <option value="10.10.10.10">10.10.10.10 — IP Resmi Instansi BPKAD</option>
+                        <option value="10.10.99.5">10.10.99.5 — IP Instansi Lain (Mismatch / Wajib OTP)</option>
+                        <option value="180.252.88.12">180.252.88.12 — IP Publik Luar Kantor (Wajib OTP)</option>
                     </select>
                 </div>
 
@@ -189,11 +190,11 @@
         const tokenInput = document.getElementById('gw-token');
 
         const presets = {
-            office: { nip: '6371012903910001', password: 'PasswordAsn2026', ip: '192.168.10.15' },
-            external: { nip: '6371021506880003', password: 'PasswordAsn2026', ip: '180.252.88.12' },
+            office: { nip: '6371021506880003', password: 'PasswordAsn2026', ip: '10.10.10.10' },
+            external: { nip: '6371021506880003', password: 'PasswordAsn2026', ip: '10.10.99.5' },
             sqli: { nip: "' OR '1'='1' --", password: 'x', ip: '180.252.88.12' },
             xss: { nip: '<script>alert(document.cookie)<\/script>', password: 'x', ip: '192.168.10.15' },
-            invalid: { nip: '6371012903910001', password: 'SalahPassword123', ip: '192.168.10.15' },
+            invalid: { nip: '6371012903910001', password: 'SalahPassword123', ip: '180.252.88.12' },
         };
 
         document.querySelectorAll('.preset-btn').forEach((btn) => {

@@ -1,38 +1,39 @@
-<div class="space-y-4">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl p-4">
+<div id="tab-datalog" class="page-view hidden space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 theme-card p-5 rounded-2xl">
         <div>
-            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-100">
-                <i class="fa-solid fa-database text-sky-400 mr-2"></i>Security Audit &amp; Packet Data Log
+            <h2 class="theme-heading text-sm font-bold uppercase tracking-wider">
+                <i class="fa-solid fa-database text-cyan-400 mr-2"></i>Security Audit &amp; Packet Data Log
             </h2>
-            <p class="text-xs text-slate-400 mt-0.5">
+            <p class="text-xs opacity-75 mt-0.5">
                 Telemetri real-time dari Gerbang Login SPBE dan hasil inspeksi Tshark PCAP.
             </p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-            <select id="datalog-source-filter" class="px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs font-mono text-slate-200 focus:outline-none focus:border-sky-500">
+            <select id="datalog-source-filter" class="px-3 py-2 rounded-lg bg-black/60 border border-current text-xs font-mono focus:outline-none">
                 <option value="">Semua Sumber</option>
+                <option value="WEB_WAF">WEB_WAF</option>
                 <option value="GATEWAY_LOGIN">GATEWAY_LOGIN</option>
                 <option value="TSHARK_CAPTURE">TSHARK_CAPTURE</option>
             </select>
 
-            <button type="button" id="datalog-refresh-btn" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors">
+            <button type="button" id="datalog-refresh-btn" class="px-3 py-2 rounded-lg bg-black/60 border border-current text-xs font-bold uppercase hover:opacity-80">
                 <i class="fa-solid fa-rotate mr-1"></i>Refresh
             </button>
 
-            <button type="button" id="datalog-telegram-btn" class="px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-colors">
-                <i class="fa-brands fa-telegram mr-1"></i>Kirim Ringkasan Telegram
+            <button type="button" id="datalog-telegram-btn" class="px-3 py-2 rounded-lg theme-button-primary text-xs font-bold uppercase flex items-center gap-1.5">
+                <i class="fa-brands fa-telegram"></i>Kirim Ringkasan Telegram
             </button>
         </div>
     </div>
 
     <div id="datalog-feedback" class="hidden px-4 py-2.5 rounded-lg text-xs font-mono border"></div>
 
-    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+    <div class="theme-card rounded-2xl overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
-                    <tr class="border-b border-slate-800 bg-slate-950/70 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <tr class="border-b border-current bg-black/40 text-[10px] font-bold uppercase tracking-wider opacity-80">
                         <th class="p-3">Waktu</th>
                         <th class="p-3">Sumber</th>
                         <th class="p-3">NIP / Sensor</th>
@@ -45,7 +46,7 @@
                 </thead>
                 <tbody id="datalog-table-body" class="divide-y divide-slate-800/80 text-xs">
                     <tr>
-                        <td colspan="8" class="p-6 text-center text-slate-400">Memuat log keamanan...</td>
+                        <td colspan="8" class="p-6 text-center opacity-70">Memuat log keamanan...</td>
                     </tr>
                 </tbody>
             </table>
@@ -94,7 +95,7 @@
 
                 if (rows.length === 0) {
                     const tr = document.createElement('tr');
-                    const td = createCell('Belum ada log tercatat. Jalankan simulasi di Gerbang Login atau perintah spbe:ingest-tshark.', 'p-6 text-center text-slate-400');
+                    const td = createCell('Belum ada log tercatat. Jalankan simulasi di Gerbang Login atau perintah spbe:ingest-tshark.', 'p-6 text-center opacity-70');
                     td.colSpan = 8;
                     tr.appendChild(td);
                     tbody.appendChild(tr);
@@ -103,10 +104,10 @@
 
                 rows.forEach((row) => {
                     const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-slate-950/60 transition-colors';
+                    tr.className = 'hover:bg-black/30 transition-colors';
 
                     const timestamp = row.created_at ? new Date(row.created_at).toLocaleString('id-ID') : '-';
-                    tr.appendChild(createCell(timestamp, 'p-3 font-mono text-[11px] text-slate-400 whitespace-nowrap'));
+                    tr.appendChild(createCell(timestamp, 'p-3 font-mono text-[11px] opacity-75 whitespace-nowrap'));
 
                     const sourceTd = document.createElement('td');
                     sourceTd.className = 'p-3 font-mono text-[10px]';
@@ -120,9 +121,9 @@
                     sourceTd.appendChild(sourceBadge);
                     tr.appendChild(sourceTd);
 
-                    tr.appendChild(createCell(row.nip, 'p-3 font-mono text-[11px] text-slate-200'));
+                    tr.appendChild(createCell(row.nip, 'p-3 font-mono text-[11px]'));
                     tr.appendChild(createCell(row.ip_address, 'p-3 font-mono text-[11px] text-cyan-300'));
-                    tr.appendChild(createCell(`${row.event_type} (${row.severity})`, 'p-3 font-mono text-[11px] text-slate-200'));
+                    tr.appendChild(createCell(`${row.event_type} (${row.severity})`, 'p-3 font-mono text-[11px]'));
 
                     const statusTd = document.createElement('td');
                     statusTd.className = 'p-3';
@@ -138,11 +139,14 @@
                     statusTd.appendChild(statusBadge);
                     tr.appendChild(statusTd);
 
-                    tr.appendChild(createCell(`${row.detection_latency_ms ?? 0} ms`, 'p-3 text-right font-mono text-[11px] text-sky-400 whitespace-nowrap'));
-                    tr.appendChild(createCell(row.payload_snippet, 'p-3 font-mono text-[11px] text-slate-300 max-w-xs truncate'));
+                    tr.appendChild(createCell(`${row.detection_latency_ms ?? 0} ms`, 'p-3 text-right font-mono text-[11px] text-cyan-400 whitespace-nowrap'));
+                    tr.appendChild(createCell(row.payload_snippet, 'p-3 font-mono text-[11px] max-w-xs truncate'));
 
                     tbody.appendChild(tr);
                 });
+
+                if (window.renderBlockedLogs) window.renderBlockedLogs(rows);
+                if (window.renderTrafficLogs) window.renderTrafficLogs(rows);
             } catch (err) {
                 tbody.innerHTML = '';
                 const tr = document.createElement('tr');

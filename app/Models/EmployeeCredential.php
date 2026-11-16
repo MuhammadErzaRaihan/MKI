@@ -78,4 +78,53 @@ class EmployeeCredential extends Model
     {
         return self::isOfficeIp($ip);
     }
+
+    public function isAllowedInstansiIp(string $ip): bool
+    {
+        $instansiMap = config('services.spbe.instansi_cidrs', []);
+
+        foreach ($instansiMap as $keyword => $cidrs) {
+            if (stripos((string) $this->instansi, (string) $keyword) !== false) {
+                return self::ipMatchesCidrs($ip, (array) $cidrs);
+            }
+        }
+
+        return self::isOfficeIp($ip);
+    }
+
+    public static function ipMatchesCidrs(string $ip, array $cidrs): bool
+    {
+        $ipBin = @inet_pton($ip);
+        if ($ipBin === false) {
+            return false;
+        }
+
+        foreach ($cidrs as $cidr) {
+            [$subnet, $bits] = array_pad(explode('/', trim((string) $cidr), 2), 2, null);
+            $subnetBin = @inet_pton($subnet);
+            if ($subnetBin === false || strlen($ipBin) !== strlen($subnetBin)) {
+                continue;
+            }
+
+            $maxBits = strlen($ipBin) * 8;
+            $prefix = $bits === null ? $maxBits : max(0, min($maxBits, (int) $bits));
+            $fullBytes = intdiv($prefix, 8);
+            $remBits = $prefix % 8;
+
+            if ($fullBytes > 0 && substr($ipBin, 0, $fullBytes) !== substr($subnetBin, 0, $fullBytes)) {
+                continue;
+            }
+
+            if ($remBits > 0) {
+                $mask = (0xFF << (8 - $remBits)) & 0xFF;
+                if ((ord($ipBin[$fullBytes]) & $mask) !== (ord($subnetBin[$fullBytes]) & $mask)) {
+                    continue;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
+    }
 }

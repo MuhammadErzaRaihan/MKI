@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('security_audit_logs', function (Blueprint $table) {
             $table->id();
-            $table->enum('source', ['GATEWAY_LOGIN', 'TSHARK_CAPTURE'])->default('GATEWAY_LOGIN');
+            $table->string('source', 32)->default('GATEWAY_LOGIN')->index();
             $table->string('nip', 64)->nullable();
             $table->string('ip_address', 45);
             $table->string('destination_ip', 45)->nullable();
