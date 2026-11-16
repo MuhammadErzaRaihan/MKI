@@ -48,6 +48,11 @@
         <span>SETTINGS</span>
       </div>
     </button>
+
+    <a href="{{ route('gateway.login.form') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold text-sky-400 hover:bg-slate-800/70 transition-colors">
+    <i class="fa-solid fa-door-open w-4 text-center"></i>
+    <span>Gerbang Login ASN</span>
+</a>
   </nav>
 
 </aside>

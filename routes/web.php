@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [MkiController::class, 'index'])->name('dashboard');
 Route::post('/gateway/login', [SpbeGatewayController::class, 'login'])->name('gateway.login');
-
+Route::get('/login', [SpbeGatewayController::class, 'showLogin'])->name('gateway.login.form');
+Route::post('/gateway/login', [SpbeGatewayController::class, 'login'])->name('gateway.login');
 Route::prefix('api')->group(function () {
     Route::get('/credentials', [CredentialController::class, 'index']);
     Route::post('/credentials', [CredentialController::class, 'store']);

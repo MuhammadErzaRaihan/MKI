@@ -289,4 +289,9 @@ class SpbeGatewayController extends Controller
             'recommended_action' => $action,
         ]);
     }
+    
+    public function showLogin()
+    {
+        return view('gateway-login');
+    }
 }
