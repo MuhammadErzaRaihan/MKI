@@ -20,7 +20,6 @@
           <i class="fa-solid fa-palette text-amber-300 text-sm"></i>
           <h3 class="theme-heading text-xs font-bold uppercase">TEMA STRUCTURAL & VISUAL</h3>
         </div>
-        <span class="font-mono text-[10px] opacity-75">3 PRESETS</span>
       </div>
 
       <div class="space-y-3">

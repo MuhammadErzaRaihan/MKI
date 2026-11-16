@@ -119,7 +119,10 @@ export function openCredentialModal(editIndex = -1) {
   const preview = document.getElementById('photo-preview');
   const editInput = document.getElementById('cred-edit-index');
 
-  if (!modal || !form) return;
+  if (!modal || !form) {
+    console.error("Element #cred-modal atau #form-credential tidak ditemukan di DOM!");
+    return;
+  }
 
   editInput.value = editIndex;
 
@@ -135,7 +138,7 @@ export function openCredentialModal(editIndex = -1) {
     if (preview) preview.src = item.photo;
     currentPhotoBase64 = item.photo;
   } else {
-    if (title) title.innerText = "SPBE DISKOMINFO - ID CARD PEGAWAI BARU";
+    if (title) title.innerText = "NEW CREDENTIAL";
     form.reset();
     if (preview) preview.src = "https://placehold.co/120x150/0066D6/ffffff?text=FOTO+ID";
     currentPhotoBase64 = "https://placehold.co/120x150/0066D6/ffffff?text=FOTO+ID";
@@ -219,11 +222,3 @@ export function deleteCredential(index) {
     if (window.openModal) window.openModal(`Kredensial pegawai <strong>${item.nama}</strong> telah dihapus.`);
   }
 }
-
-// Fallback listener otomatis saat DOM dimuat
-document.addEventListener('DOMContentLoaded', () => {
-  const form = document.getElementById('form-credential');
-  if (form) {
-    form.addEventListener('submit', (e) => saveCredentialForm(e));
-  }
-});
