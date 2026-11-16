@@ -1,71 +1,62 @@
-export let credentialsData = [
-  {
-    nip: '6371012903910001',
-    nama: 'Andi Saputra, ST',
-    instansi: 'Diskominfo (HRD)',
-    ttl: 'Banjarmasin, 29 Mar 1991',
-    telp: '0812-5551-0192',
-    status: 'ON',
-    ipDetected: '192.168.10.15 (IP Kantor)',
-    secretKey: 'SK-KALSEL-849',
-    photo: 'https://placehold.co/120x150/0066D6/ffffff?text=Andi'
-  },
-  {
-    nip: '6371021506880003',
-    nama: 'Budi Santoso, S.Kom',
-    instansi: 'BPKAD (Keuangan)',
-    ttl: 'Banjarbaru, 15 Jun 1988',
-    telp: '0813-9988-2104',
-    status: 'ON',
-    ipDetected: '180.252.88.12 (Luar Kantor)',
-    secretKey: 'SK-KALSEL-998',
-    photo: 'https://placehold.co/120x150/0284C7/ffffff?text=Budi'
-  },
-  {
-    nip: '6371043009930005',
-    nama: 'Citra Lestari, M.T',
-    instansi: 'Dinas Pemasaran',
-    ttl: 'Martapura, 30 Sep 1993',
-    telp: '0852-7711-4039',
-    status: 'OFF',
-    ipDetected: '202.158.45.99 (Luar Kantor)',
-    secretKey: 'SK-KALSEL-304',
-    photo: 'https://placehold.co/120x150/6499CC/ffffff?text=Citra'
-  }
-];
-
+let credentialsData = [];
 let currentPhotoBase64 = null;
 
-export function renderCredentials(filterQuery = '') {
+function getCsrfToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+}
+
+export async function fetchCredentials(filterQuery = '') {
   const tbody = document.getElementById('credential-table-body');
   const badge = document.getElementById('cred-count-badge');
   if (!tbody) return;
 
+  tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center opacity-70 font-sans">Memuat data kredensial pegawai...</td></tr>`;
+
+  try {
+    const url = filterQuery
+      ? `/api/credentials?q=${encodeURIComponent(filterQuery)}`
+      : '/api/credentials';
+
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) throw new Error('Gagal memuat data kredensial.');
+
+    const payload = await response.json();
+    credentialsData = payload.data || [];
+
+    if (badge) badge.innerText = `${payload.total ?? credentialsData.length} RECORD FOUND`;
+    renderCredentialsTable();
+  } catch (error) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-rose-400 font-sans">${error.message}</td></tr>`;
+  }
+}
+
+export function renderCredentials(filterQuery = '') {
+  fetchCredentials(filterQuery);
+}
+
+function renderCredentialsTable() {
+  const tbody = document.getElementById('credential-table-body');
+  if (!tbody) return;
+
   tbody.innerHTML = '';
 
-  const filtered = credentialsData.filter(item => 
-    item.nama.toLowerCase().includes(filterQuery.toLowerCase()) || 
-    item.nip.includes(filterQuery) ||
-    item.instansi.toLowerCase().includes(filterQuery.toLowerCase())
-  );
-
-  if (badge) badge.innerText = `${filtered.length} RECORD FOUND`;
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center opacity-70 font-sans">Tidak ada data pegawai ditemukan.</td></tr>`;
+  if (credentialsData.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center opacity-70 font-sans">Belum ada data pegawai tersimpan. Klik "Tambah Kredensial Pegawai" untuk menambahkan.</td></tr>`;
     return;
   }
 
-  filtered.forEach((item) => {
-    const originalIndex = credentialsData.indexOf(item);
-    const isOfficeIP = item.ipDetected.includes('IP Kantor');
+  credentialsData.forEach((item) => {
+    const isOfficeIP = Boolean(item.is_office_ip);
 
     const tr = document.createElement('tr');
     tr.className = 'hover:bg-slate-900/60 transition-colors';
     tr.innerHTML = `
       <td class="p-3">
         <div class="w-9 h-11 bg-slate-800 rounded-lg overflow-hidden border border-current shadow-sm flex items-center justify-center">
-          <img src="${item.photo}" alt="${item.nama}" class="w-full h-full object-cover">
+          <img src="${item.photo_url}" alt="${item.nama}" width="36" height="44" class="w-full h-full object-cover">
         </div>
       </td>
       <td class="p-3">
@@ -84,20 +75,20 @@ export function renderCredentials(filterQuery = '') {
       </td>
       <td class="p-3">
         <div class="text-[11px] font-bold ${isOfficeIP ? 'text-emerald-400' : 'text-cyan-400'}">
-          ${item.ipDetected}
+          ${item.ip_label}
         </div>
         <div class="mt-1">
           <span class="px-2 py-0.5 bg-black/60 border border-current rounded text-[10px] font-bold text-amber-300">
-            <i class="fa-solid fa-key text-[9px] mr-1"></i>${item.secretKey}
+            <i class="fa-solid fa-key text-[9px] mr-1"></i>${item.secret_key}
           </span>
         </div>
       </td>
       <td class="p-3 text-right">
         <div class="flex items-center justify-end gap-1.5">
-          <button type="button" onclick="window.editCredential(${originalIndex})" class="p-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition-all hover:scale-105" title="Edit Pegawai">
+          <button type="button" onclick="window.editCredential(${item.id})" class="p-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition-all hover:scale-105" title="Edit Pegawai">
             <i class="fa-solid fa-pen-to-square text-xs"></i>
           </button>
-          <button type="button" onclick="window.deleteCredential(${originalIndex})" class="p-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition-all hover:scale-105" title="Hapus Pegawai">
+          <button type="button" onclick="window.deleteCredential(${item.id})" class="p-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition-all hover:scale-105" title="Hapus Pegawai">
             <i class="fa-solid fa-trash-can text-xs"></i>
           </button>
         </div>
@@ -107,41 +98,42 @@ export function renderCredentials(filterQuery = '') {
   });
 }
 
+let searchDebounceTimer = null;
 export function searchCredentials() {
   const input = document.getElementById('credential-search');
-  if (input) renderCredentials(input.value);
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    fetchCredentials(input ? input.value.trim() : '');
+  }, 250);
 }
 
-export function openCredentialModal(editIndex = -1) {
+export function openCredentialModal(credentialId = -1) {
   const modal = document.getElementById('cred-modal');
   const form = document.getElementById('form-credential');
   const title = document.getElementById('cred-modal-title');
   const preview = document.getElementById('photo-preview');
   const editInput = document.getElementById('cred-edit-index');
 
-  if (!modal || !form) {
-    console.error("Element #cred-modal atau #form-credential tidak ditemukan di DOM!");
-    return;
-  }
+  if (!modal || !form) return;
 
-  editInput.value = editIndex;
+  editInput.value = credentialId;
+  currentPhotoBase64 = null;
 
-  if (editIndex >= 0 && credentialsData[editIndex]) {
-    const item = credentialsData[editIndex];
-    if (title) title.innerText = "EDIT KREDENSIAL PEGAWAI (ID CARD)";
-    document.getElementById('cred-nama').value = item.nama;
-    document.getElementById('cred-nip').value = item.nip;
-    document.getElementById('cred-instansi').value = item.instansi;
-    document.getElementById('cred-ttl').value = item.ttl;
-    document.getElementById('cred-telp').value = item.telp;
-    document.getElementById('cred-secret').value = item.secretKey;
-    if (preview) preview.src = item.photo;
-    currentPhotoBase64 = item.photo;
+  const existing = credentialsData.find((c) => c.id === credentialId);
+
+  if (existing) {
+    if (title) title.innerText = 'EDIT KREDENSIAL PEGAWAI (ID CARD)';
+    document.getElementById('cred-nama').value = existing.nama;
+    document.getElementById('cred-nip').value = existing.nip;
+    document.getElementById('cred-instansi').value = existing.instansi;
+    document.getElementById('cred-ttl').value = existing.ttl;
+    document.getElementById('cred-telp').value = existing.telp;
+    document.getElementById('cred-secret').value = existing.secret_key;
+    if (preview) preview.src = existing.photo_url;
   } else {
-    if (title) title.innerText = "NEW CREDENTIAL";
+    if (title) title.innerText = 'SPBE DISKOMINFO - ID CARD PEGAWAI BARU';
     form.reset();
-    if (preview) preview.src = "https://placehold.co/120x150/0066D6/ffffff?text=FOTO+ID";
-    currentPhotoBase64 = "https://placehold.co/120x150/0066D6/ffffff?text=FOTO+ID";
+    if (preview) preview.src = 'https://placehold.co/120x150/0066D6/ffffff?text=FOTO+ID';
     generateSecretKey();
   }
 
@@ -163,7 +155,7 @@ export function previewPhotoUpload(event) {
   const input = event.target || event.srcElement;
   if (input && input.files && input.files[0]) {
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
       const preview = document.getElementById('photo-preview');
       if (preview) preview.src = e.target.result;
       currentPhotoBase64 = e.target.result;
@@ -172,53 +164,81 @@ export function previewPhotoUpload(event) {
   }
 }
 
-export function saveCredentialForm(event) {
+export async function saveCredentialForm(event) {
   if (event && event.preventDefault) event.preventDefault();
 
-  const editIndex = parseInt(document.getElementById('cred-edit-index').value);
-  const nama = document.getElementById('cred-nama').value.trim();
-  const nip = document.getElementById('cred-nip').value.trim();
-  const instansi = document.getElementById('cred-instansi').value.trim();
-  const ttl = document.getElementById('cred-ttl').value.trim();
-  const telp = document.getElementById('cred-telp').value.trim();
-  const secretKey = document.getElementById('cred-secret').value;
+  const editId = parseInt(document.getElementById('cred-edit-index').value, 10);
+  const isEdit = editId > 0;
 
-  const newRecord = {
-    nip: nip,
-    nama: nama,
-    instansi: instansi,
-    ttl: ttl,
-    telp: telp,
-    status: 'ON',
-    ipDetected: '192.168.10.' + Math.floor(10 + Math.random() * 80) + ' (IP Kantor)',
-    secretKey: secretKey,
-    photo: currentPhotoBase64 || "https://placehold.co/120x150/0066D6/ffffff?text=FOTO+ID"
+  const payload = {
+    nama: document.getElementById('cred-nama').value.trim(),
+    nip: document.getElementById('cred-nip').value.trim(),
+    instansi: document.getElementById('cred-instansi').value.trim(),
+    ttl: document.getElementById('cred-ttl').value.trim(),
+    telp: document.getElementById('cred-telp').value.trim(),
+    secret_key: document.getElementById('cred-secret').value.trim(),
+    photo_base64: currentPhotoBase64,
   };
 
-  if (editIndex >= 0) {
-    credentialsData[editIndex] = newRecord;
-    if (window.openModal) window.openModal(`Data Kredensial Pegawai <strong>${nama}</strong> berhasil diperbarui.`);
-  } else {
-    credentialsData.unshift(newRecord);
-    if (window.openModal) window.openModal(`Kredensial baru untuk <strong>${nama}</strong> berhasil ditambahkan!`);
+  try {
+    const response = await fetch(isEdit ? `/api/credentials/${editId}` : '/api/credentials', {
+      method: isEdit ? 'PUT' : 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-TOKEN': getCsrfToken(),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      const firstError = result.errors
+        ? Object.values(result.errors).flat()[0]
+        : (result.message || 'Validasi gagal.');
+      throw new Error(firstError);
+    }
+
+    closeCredentialModal();
+    await fetchCredentials();
+    if (window.openModal) window.openModal(result.message);
+  } catch (error) {
+    if (window.openModal) {
+      window.openModal(`<span class="text-rose-500 font-bold">${error.message}</span>`);
+    } else {
+      alert(error.message);
+    }
   }
 
-  closeCredentialModal();
-  renderCredentials();
   return false;
 }
 
-export function editCredential(index) {
-  openCredentialModal(index);
+export function editCredential(id) {
+  openCredentialModal(id);
 }
 
-export function deleteCredential(index) {
-  const item = credentialsData[index];
+export async function deleteCredential(id) {
+  const item = credentialsData.find((c) => c.id === id);
   if (!item) return;
 
-  if (confirm(`Apakah Anda yakin ingin menghapus kredensial ${item.nama}?`)) {
-    credentialsData.splice(index, 1);
-    renderCredentials();
-    if (window.openModal) window.openModal(`Kredensial pegawai <strong>${item.nama}</strong> telah dihapus.`);
+  if (!confirm(`Apakah Anda yakin ingin menghapus kredensial ${item.nama}?`)) return;
+
+  try {
+    const response = await fetch(`/api/credentials/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json',
+        'X-CSRF-TOKEN': getCsrfToken(),
+      },
+    });
+
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Gagal menghapus data.');
+
+    await fetchCredentials();
+    if (window.openModal) window.openModal(result.message);
+  } catch (error) {
+    alert(error.message);
   }
 }
