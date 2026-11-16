@@ -97,4 +97,21 @@ class SpbeGatewayLoginTest extends TestCase
 
         Http::assertSent(fn ($request) => str_contains($request['text'] ?? '', 'SQL_INJECTION'));
     }
+
+    public function test_gateway_login_view_and_datalogs_api_render_properly(): void
+    {
+        $this->get('/login')
+            ->assertStatus(200)
+            ->assertSee('Gerbang Autentikasi SPBE');
+
+        $this->postJson('/gateway/login', [
+            'nip' => "' OR '1'='1' --",
+            'password' => 'x',
+            'simulated_ip' => '180.252.88.12',
+        ])->assertStatus(403);
+
+        $this->getJson('/api/datalogs?source=GATEWAY_LOGIN')
+            ->assertStatus(200)
+            ->assertJsonFragment(['event_type' => 'SQL_INJECTION']);
+    }
 }

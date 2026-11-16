@@ -9,50 +9,60 @@
       </div>
     </div>
 
-    <button onclick="window.openModal('Memuat laporan insiden #INC-2048 format PDF...')" class="px-4 py-2.5 theme-button-primary text-xs uppercase font-bold flex items-center gap-2">
-      <i class="fa-solid fa-floppy-disk"></i>
-      <span>EXPORT REPORT</span>
-    </button>
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="{{ route('gateway.login.form') }}" class="px-4 py-2.5 theme-button-primary text-xs uppercase font-bold flex items-center gap-2">
+        <i class="fa-solid fa-shield-halved"></i>
+        <span>BUKA GERBANG LOGIN</span>
+      </a>
+      <button onclick="window.openModal('Memuat laporan insiden #INC-2048 format PDF...')" class="px-4 py-2.5 theme-button-primary text-xs uppercase font-bold flex items-center gap-2">
+        <i class="fa-solid fa-floppy-disk"></i>
+        <span>EXPORT REPORT</span>
+      </button>
+    </div>
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
     <div class="theme-card p-4 flex items-center justify-between rounded-2xl">
       <div>
-        <div class="text-[10px] font-mono uppercase tracking-wider opacity-70">AFFECTED ASSET</div>
-        <div class="font-brutal font-black text-xl mt-1">Finance-DB-01</div>
+        <div class="text-[10px] font-mono uppercase tracking-wider opacity-70">SERANGAN DIBLOKIR</div>
+        <div class="font-brutal font-black text-xl mt-1 text-rose-400">{{ $stats['blocked_count'] ?? 0 }}</div>
+        <div class="text-[10px] font-mono opacity-60 mt-0.5">SQLi, XSS &amp; anomali paket</div>
       </div>
-      <div class="w-10 h-10 bg-black/40 border border-current flex items-center justify-center font-bold text-lg rounded-xl">
-        <i class="fa-solid fa-server"></i>
-      </div>
-    </div>
-
-    <div class="theme-card p-4 flex items-center justify-between rounded-2xl">
-      <div>
-        <div class="text-[10px] font-mono uppercase tracking-wider opacity-70">MITRE TECHNIQUE</div>
-        <div class="font-brutal font-black text-xl mt-1">T1078</div>
-      </div>
-      <div class="w-10 h-10 bg-black/40 border border-current flex items-center justify-center font-bold text-lg rounded-xl">
-        <i class="fa-solid fa-crosshairs"></i>
+      <div class="w-10 h-10 bg-black/40 border border-current flex items-center justify-center font-bold text-lg rounded-xl text-rose-400">
+        <i class="fa-solid fa-ban"></i>
       </div>
     </div>
 
     <div class="theme-card p-4 flex items-center justify-between rounded-2xl">
       <div>
-        <div class="text-[10px] font-mono uppercase tracking-wider opacity-70">SOURCE IP</div>
-        <div class="font-brutal font-black text-xl mt-1">203.145.12.89</div>
+        <div class="text-[10px] font-mono uppercase tracking-wider opacity-70">AKSES MENCURIGAKAN</div>
+        <div class="font-brutal font-black text-xl mt-1 text-amber-300">{{ $stats['suspicious_count'] ?? 0 }}</div>
+        <div class="text-[10px] font-mono opacity-60 mt-0.5">IP luar kantor / MFA</div>
       </div>
-      <div class="w-10 h-10 bg-black/40 border border-current flex items-center justify-center font-bold text-lg rounded-xl">
-        <i class="fa-solid fa-network-wired"></i>
+      <div class="w-10 h-10 bg-black/40 border border-current flex items-center justify-center font-bold text-lg rounded-xl text-amber-300">
+        <i class="fa-solid fa-triangle-exclamation"></i>
       </div>
     </div>
 
     <div class="theme-card p-4 flex items-center justify-between rounded-2xl">
       <div>
-        <div class="text-[10px] font-mono uppercase tracking-wider opacity-70">CONFIDENCE</div>
-        <div class="font-brutal font-black text-xl mt-1">92%</div>
+        <div class="text-[10px] font-mono uppercase tracking-wider opacity-70">AVG DETECTION LATENCY</div>
+        <div class="font-brutal font-black text-xl mt-1 text-cyan-400">{{ $stats['avg_latency_ms'] ?? 0 }} ms</div>
+        <div class="text-[10px] font-mono opacity-60 mt-0.5">Dari {{ $stats['total_events'] ?? 0 }} total event</div>
       </div>
-      <div class="w-10 h-10 bg-black/40 border border-current flex items-center justify-center font-bold text-lg rounded-xl">
-        <i class="fa-solid fa-bullseye"></i>
+      <div class="w-10 h-10 bg-black/40 border border-current flex items-center justify-center font-bold text-lg rounded-xl text-cyan-400">
+        <i class="fa-solid fa-gauge-high"></i>
+      </div>
+    </div>
+
+    <div class="theme-card p-4 flex items-center justify-between rounded-2xl">
+      <div>
+        <div class="text-[10px] font-mono uppercase tracking-wider opacity-70">KREDENSIAL ASN AKTIF</div>
+        <div class="font-brutal font-black text-xl mt-1 text-emerald-400">{{ $stats['active_asn'] ?? 0 }}</div>
+        <div class="text-[10px] font-mono opacity-60 mt-0.5">Terdaftar pada Gerbang SPBE</div>
+      </div>
+      <div class="w-10 h-10 bg-black/40 border border-current flex items-center justify-center font-bold text-lg rounded-xl text-emerald-400">
+        <i class="fa-solid fa-id-card-clip"></i>
       </div>
     </div>
   </div>
@@ -127,7 +137,7 @@
     <div class="theme-card p-5 space-y-4">
       <div class="flex items-center justify-between border-b border-current pb-3">
         <h3 class="theme-heading text-xs font-bold uppercase">LOGIN ATTEMPTS</h3>
-        <span class="font-mono text-sm font-bold text-amber-300">76</span>
+        <span class="font-mono text-sm font-bold text-amber-300">{{ $stats['total_events'] ?? 0 }}</span>
       </div>
       <div class="w-full h-48 relative">
         <canvas id="chartLoginAttempts"></canvas>
@@ -137,7 +147,7 @@
     <div class="theme-card p-5 space-y-4">
       <div class="flex items-center justify-between border-b border-current pb-3">
         <h3 class="theme-heading text-xs font-bold uppercase">THREAT DETECTION</h3>
-        <span class="font-mono text-xs font-bold text-emerald-400">+40%</span>
+        <span class="font-mono text-xs font-bold text-emerald-400">{{ $stats['blocked_count'] ?? 0 }} BLOCKED</span>
       </div>
       <div class="w-full h-48 relative">
         <canvas id="chartThreatDetection"></canvas>
