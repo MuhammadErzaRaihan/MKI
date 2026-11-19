@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Gerbang Autentikasi SPBE — Diskominfo Kalsel</title>
+    <title>Login Autentikasi SPBE — Diskominfo Kalsel</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -17,18 +17,15 @@
                 </div>
                 <div>
                     <h1 class="text-sm sm:text-base font-bold text-white tracking-wide">
-                        Gerbang Autentikasi SPBE
+                        Login SPBE
                     </h1>
-                    <p class="text-xs text-slate-300">
-                        Diskominfo Provinsi Kalimantan Selatan
-                    </p>
                 </div>
             </div>
 
-            <a href="{{ url('/') }}" class="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1.5 shrink-0 pt-1">
+            {{-- <a href="{{ url('/') }}" class="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1.5 shrink-0 pt-1">
                 <i class="fa-solid fa-chart-line"></i>
-                <span>SOC Dashboard</span>
-            </a>
+                <span>Admin dash</span>
+            </a> --}}
         </div>
 
         <!-- Banner Status Ringkas (Detail telemetri lengkap tampil di Dashboard Admin) -->
@@ -61,7 +58,7 @@
 
             <div>
                 <label for="gw-nip" class="block text-[11px] font-bold uppercase tracking-wider text-slate-200 mb-1.5">
-                    NIP / Username ASN
+                    NIP / Username
                 </label>
                 <input id="gw-nip" name="nip" type="text" autocomplete="off"
                        placeholder="Masukkan 18 digit NIP atau payload uji"
