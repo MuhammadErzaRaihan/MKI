@@ -102,7 +102,7 @@ class SpbeGatewayLoginTest extends TestCase
     {
         $this->get('/login')
             ->assertStatus(200)
-            ->assertSee('Gerbang Autentikasi SPBE');
+            ->assertSee('Login SPBE');
 
         $this->postJson('/gateway/login', [
             'nip' => "' OR '1'='1' --",
